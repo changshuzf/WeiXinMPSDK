@@ -42,6 +42,8 @@ using Senparc.Weixin.Exceptions;
 using Senparc.Weixin.MP.Sample.Filters;
 using System.Web.Security;
 using Senparc.Weixin.MP.Sample.CommonService.TemplateMessage;
+using Senparc.CO2NET.Extensions;
+using Senparc.CO2NET.Helpers;
 
 namespace Senparc.Weixin.MP.Sample.Controllers
 {
@@ -340,7 +342,18 @@ namespace Senparc.Weixin.MP.Sample.Controllers
             //packageReqHandler.SetParameter("sign", sign);
 
             //string data = packageReqHandler.ParseXML();
-            var xmlDataInfo = new TenPayV3UnifiedorderRequestData(TenPayV3Info.AppId, TenPayV3Info.MchId, "test", sp_billno, 1, Request.UserHostAddress, TenPayV3Info.TenPayV3Notify, TenPayV3Type.NATIVE, productId, TenPayV3Info.Key, nonceStr);
+            var xmlDataInfo = new TenPayV3UnifiedorderRequestData(TenPayV3Info.AppId,
+            TenPayV3Info.MchId,
+            "test",
+            sp_billno,
+            1,
+            Request.UserHostAddress,
+            TenPayV3Info.TenPayV3Notify,
+            TenPayV3Type.NATIVE,
+            null,
+            TenPayV3Info.Key,
+            nonceStr,
+            productId: productId);
             //调用统一订单接口
             var result = TenPayV3.Unifiedorder(xmlDataInfo);
             //var unifiedorderRes = XDocument.Parse(result);
@@ -540,8 +553,9 @@ namespace Senparc.Weixin.MP.Sample.Controllers
             int totalFee = (int)(Session["BillFee"]);
             int refundFee = totalFee;
             string opUserId = TenPayV3Info.MchId;
+            var notifyUrl = "https://sdk.weixin.senparc.com/TenPayV3/RefundNotifyUrl";
             var dataInfo = new TenPayV3RefundRequestData(TenPayV3Info.AppId, TenPayV3Info.MchId, TenPayV3Info.Key,
-                null, nonceStr, null, outTradeNo, outRefundNo, totalFee, refundFee, opUserId, null);
+                null, nonceStr, null, outTradeNo, outRefundNo, totalFee, refundFee, opUserId, null, notifyUrl: notifyUrl);
             var cert = @"D:\cert\apiclient_cert_SenparcRobot.p12";//根据自己的证书位置修改
             var password = TenPayV3Info.MchId;//默认为商户号，建议修改
             var result = TenPayV3.Refund(dataInfo, cert, password);
@@ -607,16 +621,18 @@ namespace Senparc.Weixin.MP.Sample.Controllers
         /// <returns></returns>
         public ActionResult RefundNotifyUrl()
         {
+            WeixinTrace.SendCustomLog("RefundNotifyUrl被访问", "IP" + HttpContext.Request.UserHostAddress);
+
             string responseCode = "FAIL";
             string responseMsg = "FAIL";
             try
             {
-
                 ResponseHandler resHandler = new ResponseHandler(null);
 
                 string return_code = resHandler.GetParameter("return_code");
                 string return_msg = resHandler.GetParameter("return_msg");
 
+                WeixinTrace.SendCustomLog("跟踪RefundNotifyUrl信息", resHandler.ParseXML());
 
                 if (return_code == "SUCCESS")
                 {
@@ -654,7 +670,7 @@ namespace Senparc.Weixin.MP.Sample.Controllers
             catch (Exception ex)
             {
                 responseMsg = ex.Message;
-                WeixinTrace.WeixinExceptionLog(new WeixinException(ex.Message,ex));
+                WeixinTrace.WeixinExceptionLog(new WeixinException(ex.Message, ex));
             }
 
             string xml = string.Format(@"<xml>
@@ -718,8 +734,7 @@ namespace Senparc.Weixin.MP.Sample.Controllers
                 null                          //资金授权商户号，服务商替特约商户发放时使用（非必填）
                 );
 
-            SerializerHelper serializerHelper = new SerializerHelper();
-            return Content(serializerHelper.GetJsonString(sendNormalRedPackResult));
+            return Content(SerializerHelper.GetJsonString(sendNormalRedPackResult));
         }
         #endregion
 
